@@ -29,8 +29,10 @@
   (member (pathname-type filename) *useful-files*
           :test #'string-equal))
 
-(defun load-torrent (filename)
-  (call-rtorrent "load" filename))
+(defun load-torrent (filename &key start)
+  (call-rtorrent (if start
+                     "load_start"
+                     "load") filename))
 
 (defun disable-not-needed-files (torrent)
   (loop for index from 0
@@ -42,12 +44,17 @@
     (disable-not-needed-files
      (car (last (call-rtorrent "download_list" "") n))))
 
-(defun inotify-loop (directory)
+(defun process-torrent (filename)
+  (when (equal (pathname-type filename)
+               "torrent")
+    (format t "Loading ~a~%" filename)
+    (load-torrent (namestring filename)
+                  :start (equal "v" (pathname-name filename)))
+    (disable-last-torrent)
+    (when (probe-file filename)
+      (delete-file filename))))
+
+(defun inotify-loop (&optional (directory (user-homedir-pathname)))
   (inotify:with-inotify (inot `((,directory ,inotify:in-create)))
-    (loop (let ((filename (inotify:event-full-name
-                           (inotify:read-event inot))))
-            (when (equal (pathname-type filename)
-                         "torrent")
-              (format t "Loading ~a~%" filename)
-              (load-torrent (namestring filename))
-              (disable-last-torrent))))))
+    (loop
+     (process-torrent (inotify:event-full-name (inotify:read-event inot))))))
