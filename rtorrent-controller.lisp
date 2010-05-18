@@ -21,7 +21,7 @@
                    torrent
                    (call-rtorrent "d.get_name" torrent))))
 
-(defvar *useful-files* '("flac" "cue" "mp3" "ape" "wv"
+(defvar *useful-files* '("flac" "cue" "mp3" "ape" "wv" "m4a"
                          "pdf" "djvu"
                          "avi" "mkv" "mp4" "vob" "ifo" "bup" "mov"))
 
@@ -47,9 +47,9 @@
 (defun process-torrent (filename)
   (when (equal (pathname-type filename)
                "torrent")
-    (format t "Loading ~a~%" filename)
-    (load-torrent (namestring filename)
-                  :start (equal "v" (pathname-name filename)))
+    (let ((namestring (remove #\\ (namestring filename))))
+      (format t "Loading ~a~%" namestring)
+      (load-torrent namestring :start (equal "v" namestring)))
     (disable-last-torrent)
     (when (probe-file filename)
       (delete-file filename))))
