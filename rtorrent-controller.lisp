@@ -21,7 +21,7 @@
                    torrent
                    (call-rtorrent "d.get_name" torrent))))
 
-(defvar *useful-files* '("flac" "cue" "mp3" "ape" "wv" "m4a"
+(defvar *useful-files* '("flac" "cue" "mp3" "ape" "wv" "m4a" "ac3"
                          "pdf" "djvu"
                          "avi" "mkv" "mp4" "vob" "ifo" "bup" "mov"))
 
@@ -49,12 +49,15 @@
                "torrent")
     (let ((namestring (remove #\\ (namestring filename))))
       (format t "Loading ~a~%" namestring)
-      (load-torrent namestring :start (equal "v" namestring)))
+      (load-torrent namestring :start (equal "v" (pathname-name filename))))
     (disable-last-torrent)
-    (when (probe-file filename)
-      (delete-file filename))))
+    (handler-case (delete-file filename)
+      (file-error ()))))
 
 (defun inotify-loop (&optional (directory (user-homedir-pathname)))
-  (inotify:with-inotify (inot `((,directory ,inotify:in-create)))
+  (inotify:with-inotify (inot `((,directory ,(logior inotify:in-create
+                                                     inotify:in-moved-to))))
+    (write-line "Waiting for files.")
     (loop
-     (process-torrent (inotify:event-full-name (inotify:read-event inot))))))
+     (dolist (event (inotify:read-events inot))
+       (process-torrent (inotify:event-full-name event))))))
