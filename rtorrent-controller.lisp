@@ -49,10 +49,14 @@
                "torrent")
     (let ((namestring (remove #\\ (namestring filename))))
       (format t "Loading ~a~%" namestring)
-      (load-torrent namestring :start (equal "v" (pathname-name filename))))
-    (disable-last-torrent)
-    (handler-case (delete-file filename)
-      (file-error ()))))
+      (handler-case
+          (progn
+            (load-torrent namestring :start (equal "v" (pathname-name filename)))
+            (disable-last-torrent)
+            (handler-case (delete-file filename)
+              (file-error ())))
+        (error (e)
+          (warn "An error ~a has occured while communicating with rTorrent." e))))))
 
 (defun inotify-loop (&optional (directory (user-homedir-pathname)))
   (inotify:with-inotify (inot `((,directory ,(logior inotify:in-create
