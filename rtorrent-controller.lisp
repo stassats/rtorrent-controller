@@ -58,7 +58,12 @@
         (error (e)
           (warn "An error ~a has occured while communicating with rTorrent." e))))))
 
+(defun load-existing-torrents (directory)
+  (mapcar #'process-torrent
+	  (directory (merge-pathnames "*.torrent" directory))))
+
 (defun inotify-loop (&optional (directory (user-homedir-pathname)))
+  (load-existing-torrents directory)
   (inotify:with-inotify (inot `((,directory ,(logior inotify:in-create
                                                      inotify:in-moved-to))))
     (write-line "Waiting for files.")
