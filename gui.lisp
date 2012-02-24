@@ -82,8 +82,11 @@
   ((torrent :initarg :torrent
             :initform nil
             :accessor torrent)
-   (files :initform nil
-          :accessor files))
+   (files :initarg :files
+          :initform nil
+          :accessor files) 
+   (file-list :initform nil
+              :accessor file-list))
   (:metaclass qt-class)
   (:qt-superclass "QDialog")
   (:slots ("search(QString)" search-file)))
@@ -94,23 +97,24 @@
 
 (defmethod initialize-instance :after ((window details) &key torrent)
   (new window)
-
+  (setf (files window) (list-files-with-bytes torrent))
   (let ((vbox (#_new QVBoxLayout window))
         (list (make-instance 'list-widget
-                             :items (list-files-with-bytes torrent)))
+                             :items (files window)))
         (search (#_new QLineEdit)))
-    (setf (files window) list)
+    (setf (file-list window) list)
     (add-widgets vbox search list)
     (connect search "textEdited(QString)"
              window "search(QString)")))
 
 (defun search-file (window text)
   (let ((text (string-trim '(#\Space #\Newline #\Return #\Tab) text))
-        (files (items (files window))))
-    (setf (items (files window))
+        (files (files window)))
+    (setf (items (file-list window))
           (if (equal "" text)
               files
               (remove-if-not
                (lambda (string)
                  (search text string :test #'char-equal))
-               files)))))
+               files
+               :key #'car)))))
