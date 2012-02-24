@@ -1,6 +1,7 @@
 ;;; -*- Mode: Lisp -*-
 
 (defpackage #:rtorrent-controller
-  (:use #:cl)
+  (:use #:cl #:qt #:qt-ui)
   (:export
-   #:inotify-loop))
+   #:inotify-loop
+   #:gui))

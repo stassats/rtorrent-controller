@@ -15,11 +15,13 @@
           (call-rtorrent "f.multicall" torrent
                          "" "f.get_path=")))
 
+(defun list-files-with-size (torrent)
+  (call-rtorrent "f.multicall" torrent
+                 "" "f.get_path=" "f.get_size_bytes="))
+
 (defun list-torrents ()
-  (loop for torrent in (call-rtorrent "download_list" "")
-        do (format t "~a ~s~%"
-                   torrent
-                   (call-rtorrent "d.get_name" torrent))))
+  (call-rtorrent "d.multicall" "" "d.get_hash=" "d.get_name="
+                 "d.get_left_bytes="))
 
 (defvar *useful-files* '("flac" "cue" "mp3" "ape" "wv" "m4a" "ac3"
                          "pdf" "djvu"
