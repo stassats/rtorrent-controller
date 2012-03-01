@@ -20,8 +20,17 @@
                  "" "f.get_path=" "f.get_size_bytes="))
 
 (defun list-torrents ()
-  (call-rtorrent "d.multicall" "" "d.get_hash=" "d.get_name="
-                 "d.get_left_bytes="))
+  (call-rtorrent "d.multicall" ""
+                 "d.get_hash="
+                 "d.get_name="
+                 "d.get_left_bytes="
+                 "d.get_state="))
+
+(defun stop (hash)
+  (call-rtorrent "d.stop" hash))
+
+(defun start (hash)
+  (call-rtorrent "d.start" hash))
 
 (defvar *useful-files* '("flac" "cue" "mp3" "ape" "wv" "m4a" "ac3"
                          "pdf" "djvu"

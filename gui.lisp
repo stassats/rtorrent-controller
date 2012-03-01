@@ -27,9 +27,12 @@
   ()
   (:metaclass qt-class)
   (:qt-superclass "QTreeView")
-  (:slots)
+  (:slots
+   ("startTorrent()" start-torrent)
+   ("stopTorrent()" stop-torrent)
+   ("removeTorrent()" remove-torrent))
   (:default-initargs
-   :header '("Hash" "Name" "Left to download")))
+   :header '("Name" "Left to download" "Status")))
 
 (defclass main-window ()
   ((torrents :initform nil
@@ -48,15 +51,23 @@
         return (format nil "~$ ~a" (/ bytes prev) unit)))
 
 (defun list-torrents-with-bytes ()
-  (loop for (torrent name left) in (list-torrents)
-        collect (list torrent name (format-bytes left))))
+  (loop for (torrent name left state . rest) in (list-torrents)
+        collect (list* torrent
+                       name
+                       (format-bytes left)
+                       (if (= state 0)
+                           "Stopped"
+                           "Started")
+                       rest)))
 
 (defmethod initialize-instance :after ((window main-window) &key)
   (new window)
   (setf (torrents window) (list-torrents-with-bytes))
   (let ((vbox (#_new QVBoxLayout window))
         (list (make-instance 'torrent-list
-                             :items (torrents window)))
+                             :row-key #'cdr
+                             :items (torrents window)
+                             :selection-behavior :rows))
         (search (#_new QLineEdit)))
     (setf (torrent-list window) list)
     (add-widgets vbox search list)
@@ -66,7 +77,8 @@
 (defun search-torrent (window text)
   (let ((text (string-trim '(#\Space #\Newline #\Return #\Tab) text))
         (torrents (torrents window)))
-    (setf (items (torrent-list window))
+    (setf (items (torrent-list window)
+                 :row-key #'cdr)
           (if (equal "" text)
               torrents
               (remove-if-not
@@ -75,8 +87,24 @@
                torrents
                :key #'second)))))
 
+(defmethod display-menu ((widget torrent-list) item)
+  (let ((menu (#_new QMenu)))
+    (#_addAction menu "Stop" widget (QSLOT "stopTorrent()"))
+    (#_addAction menu "Start" widget (QSLOT "startTorrent()"))
+    (#_addAction menu "Remove torrent" widget (QSLOT "removeTorrent()"))
+    menu))
+
+(defun stop-torrent (torrent-list)
+  (loop for (hash) in (selected-items torrent-list)
+        do (stop hash)))
+
+(defun start-torrent (torrent-list)
+  (loop for (hash) in (selected-items torrent-list)
+        do (start hash)))
+;;;
+
 (defmethod view-item ((list torrent-list) item)
-  (#_exec (make-instance 'details :torrent item)))
+  (#_exec (make-instance 'details :torrent (car item))))
 
 (defclass details ()
   ((torrent :initarg :torrent
