@@ -38,17 +38,14 @@
   ((torrents :initform nil
              :accessor torrents)
    (torrent-list :initform nil
-                :accessor torrent-list))
+                :accessor torrent-list)
+   (status-fields :initarg :status-fields
+                  :initform nil
+                  :accessor status-fields))
   (:metaclass qt-class)
   (:qt-superclass "QDialog")
-  (:slots ("search(QString)" search-torrent)))
-
-(defun format-bytes (bytes)
-  (loop for unit in '("" "KB" "MB" "GB" "TB")
-        for prev = 1 then multiplier
-        for multiplier = 1024 then (* multiplier 1024)
-        when (< bytes multiplier)
-        return (format nil "~$ ~a" (/ bytes prev) unit)))
+  (:slots ("search(QString)" search-torrent)
+          ("statusUpdate()" status-update)))
 
 (defun list-torrents-with-bytes ()
   (loop for (torrent name left state . rest) in (list-torrents)
@@ -60,6 +57,33 @@
                            "Started")
                        rest)))
 
+(defun add-permanent-widgets (status-bar &rest widgets)
+  (loop for widget in widgets
+        do (#_addPermanentWidget status-bar widget)))
+
+(defun add-status-bar (window)
+  (let* ((status-bar (#_new QStatusBar))
+         (status (status))
+         (up-rate (#_new QLabel (format nil "U: ~a" (first status))))
+         (down-rate (#_new QLabel (format nil "D: ~a" (second status))))
+         (timer (#_new QTimer window)))
+    (setf (status-fields window)
+          (list :up-rate up-rate
+                :down-rate down-rate))
+    (add-permanent-widgets status-bar down-rate up-rate)
+    
+    (connect timer "timeout()" window (qslot "statusUpdate()"))
+    (#_start timer 1000)
+    status-bar))
+
+(defun status-update (window)
+  (let ((fields (status-fields window))
+        (status (status)))
+    (setf (#_text (getf fields :up-rate))
+          (format nil "U: ~a" (first status)))
+    (setf (#_text (getf fields :down-rate))
+          (format nil "U: ~a" (second status)))))
+
 (defmethod initialize-instance :after ((window main-window) &key)
   (new window)
   (setf (torrents window) (list-torrents-with-bytes))
@@ -68,11 +92,11 @@
                              :row-key #'cdr
                              :items (torrents window)
                              :selection-behavior :rows))
-        (search (#_new QLineEdit)))
+        (search (#_new QLineEdit))
+        (status-bar (add-status-bar window)))
     (setf (torrent-list window) list)
-    (add-widgets vbox search list)
-    (connect search "textEdited(QString)"
-             window "search(QString)")))
+    (add-widgets vbox search list status-bar)
+    (connect search "textEdited(QString)" window "search(QString)")))
 
 (defun search-torrent (window text)
   (let ((text (string-trim '(#\Space #\Newline #\Return #\Tab) text))
@@ -101,6 +125,7 @@
 (defun start-torrent (torrent-list)
   (loop for (hash) in (selected-items torrent-list)
         do (start hash)))
+
 ;;;
 
 (defmethod view-item ((list torrent-list) item)

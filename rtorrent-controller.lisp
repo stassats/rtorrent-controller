@@ -32,6 +32,26 @@
 (defun start (hash)
   (call-rtorrent "d.start" hash))
 
+(defun multicall (&rest args)
+  (call-rtorrent "system.multicall"
+                 (loop for (method . parameters) in args
+                       collect
+                       (s-xml-rpc:xml-rpc-struct "methodName" method "params"
+                                                 (or parameters
+                                                     #())))))
+(defun format-bytes (bytes)
+  (loop for unit in '("" "KB" "MB" "GB" "TB")
+        for prev = 1 then multiplier
+        for multiplier = 1024 then (* multiplier 1024)
+        when (< bytes multiplier)
+        return (format nil "~$ ~a" (/ bytes prev) unit)))
+
+(defun status ()
+  (mapcar #'format-bytes
+          (mapcar #'car (multicall '("get_up_rate") '("get_down_rate")))))
+
+;;;
+
 (defvar *useful-files* '("flac" "cue" "mp3" "ape" "wv" "m4a" "ac3"
                          "pdf" "djvu"
                          "avi" "mkv" "mp4" "vob" "ifo" "bup" "mov"))
