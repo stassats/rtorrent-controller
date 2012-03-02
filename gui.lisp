@@ -49,15 +49,12 @@
           ("changeMaxUp(int)" change-max-up)
           ("changeMaxDown(int)" change-max-down)))
 
-(defun list-torrents-with-bytes ()
-  (loop for (torrent name left state . rest) in (list-torrents)
-        collect (list* torrent
-                       name
-                       (format-bytes left)
-                       (if (= state 0)
-                           "Stopped"
-                           "Started")
-                       rest)))
+(defun list-torrents-humanly ()
+  (process-lists
+   '(2 format-bytes
+     3 state-description
+     4 format-bytes)
+   (list-torrents)))
 
 (defun add-permanent-widgets (status-bar &rest widgets)
   (loop for widget in widgets
@@ -74,36 +71,36 @@
                 :down-rate (#_new QLabel)
                 :max-down max-down))
 
-    (setf (#_singleStep max-up) 50
-          (#_singleStep max-down) 50
-          (#_maximum max-up) 10000
-          (#_maximum max-down) 10000)
+    (#_setSingleStep max-up 50)
+    (#_setSingleStep max-down 50)
+    (#_setMaximum max-up 10000)
+    (#_setMaximum max-down 10000)
 
     (connect max-up "valueChanged(int)" window "changeMaxUp(int)")
     (connect max-down "valueChanged(int)" window "changeMaxDown(int)")
     (loop for (nil widget) on (status-fields window) by #'cddr
           do (add-permanent-widgets status-bar widget))
-    
+
     (connect timer "timeout()" window (qslot "statusUpdate()"))
-    (#_start timer 1000)
+    (#_start timer 1100)
     status-bar))
 
 (defun status-update (window)
   (destructuring-bind (&key up-rate max-up down-rate max-down)
       (status-fields window)
-    (with-signals-blocked (max-up max-down) 
+    (with-signals-blocked (max-up max-down)
         (destructuring-bind (v-up-rate v-down-rate v-max-up v-max-down)
             (status)
-          (setf (#_text up-rate)
-                (format nil "U: ~10@a" (format-bytes v-up-rate))
-                (#_text down-rate)
-                (format nil "D: ~10@a" (format-bytes v-down-rate))
-                (#_value max-up) (floor v-max-up 1024)
-                (#_value max-down) (floor v-max-down 1024))))))
+          (#_setText up-rate
+                     (format nil "U: ~10@a" (format-bytes v-up-rate)))
+          (#_setText down-rate
+                     (format nil "D: ~10@a" (format-bytes v-down-rate)))
+          (#_setValue max-up (floor v-max-up 1024))
+          (#_setValue max-down (floor v-max-down 1024))))))
 
 (defmethod initialize-instance :after ((window main-window) &key)
   (new window)
-  (setf (torrents window) (list-torrents-with-bytes))
+  (setf (torrents window) (list-torrents-humanly))
   (let ((vbox (#_new QVBoxLayout window))
         (list (make-instance 'torrent-list
                              :row-key #'cdr
@@ -156,13 +153,21 @@
 (defmethod view-item ((list torrent-list) item)
   (#_exec (make-instance 'details :torrent (car item))))
 
+(defclass file-list (list-widget)
+  ()
+  (:metaclass qt-class)
+  (:qt-superclass "QTreeView")
+  (:slots)
+  (:default-initargs
+   :header '("Name" "Size" "Priority")))
+
 (defclass details ()
   ((torrent :initarg :torrent
             :initform nil
             :accessor torrent)
    (files :initarg :files
           :initform nil
-          :accessor files) 
+          :accessor files)
    (file-list :initform nil
               :accessor file-list))
   (:metaclass qt-class)
@@ -170,14 +175,16 @@
   (:slots ("search(QString)" search-file)))
 
 (defun list-files-with-bytes (torrent)
-  (loop for (path size) in (list-files-with-size torrent)
-        collect (list path (format-bytes size))))
+  (process-lists
+   '(1 format-bytes
+     2 priority-description)
+   (list-files-with-size torrent)))
 
 (defmethod initialize-instance :after ((window details) &key torrent)
   (new window)
   (setf (files window) (list-files-with-bytes torrent))
   (let ((vbox (#_new QVBoxLayout window))
-        (list (make-instance 'list-widget
+        (list (make-instance 'file-list
                              :items (files window)))
         (search (#_new QLineEdit)))
     (setf (file-list window) list)

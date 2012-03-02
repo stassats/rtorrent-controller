@@ -17,14 +17,17 @@
 
 (defun list-files-with-size (torrent)
   (call-rtorrent "f.multicall" torrent
-                 "" "f.get_path=" "f.get_size_bytes="))
+                 "" "f.get_path="
+                 "f.get_size_bytes="
+                 "f.get_priority=" ))
 
 (defun list-torrents ()
   (call-rtorrent "d.multicall" ""
                  "d.get_hash="
                  "d.get_name="
                  "d.get_left_bytes="
-                 "d.get_state="))
+                 "d.get_state="
+                 "d.get_down_rate="))
 
 (defun stop (hash)
   (call-rtorrent "d.stop" hash))
@@ -45,6 +48,27 @@
         for multiplier = 1024 then (* multiplier 1024)
         when (< bytes multiplier)
         return (format nil "~$ ~a" (/ bytes prev) unit)))
+
+(defun process-list (functions list)
+  (loop for x in list
+        for i from 0
+        collect (funcall (getf functions i #'identity)
+                         x)))
+
+(defun process-lists (functions lists)
+  (loop for list in lists
+        collect (process-list functions list)))
+
+(defun state-description (n)
+  (ecase n
+    (0 "Stopped")
+    (1 "Started")))
+
+(defun priority-description (n)
+  (ecase n
+    (0 "Off")
+    (1 "Normal")
+    (2 "High")))
 
 (defun status ()
   (mapcar #'car (multicall '("get_up_rate") '("get_down_rate")
