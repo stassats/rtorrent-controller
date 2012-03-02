@@ -47,8 +47,14 @@
         return (format nil "~$ ~a" (/ bytes prev) unit)))
 
 (defun status ()
-  (mapcar #'format-bytes
-          (mapcar #'car (multicall '("get_up_rate") '("get_down_rate")))))
+  (mapcar #'car (multicall '("get_up_rate") '("get_down_rate")
+                           '("get_upload_rate") '("get_download_rate"))))
+
+(defun set-download-rate (value)
+  (call-rtorrent "set_download_rate" value))
+
+(defun set-upload-rate (value)
+  (call-rtorrent "set_upload_rate" value))
 
 ;;;
 
