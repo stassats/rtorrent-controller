@@ -21,7 +21,10 @@
          (with-sbcl-float-traps
            (#_show window)
            (#_exec *qapp*))
-      (#_hide window))))
+      (progn
+        (when (timer window)
+          (#_stop (timer window)))
+        (#_hide window)))))
 
 (defclass torrent-list (list-widget)
   ()
@@ -41,7 +44,9 @@
                 :accessor torrent-list)
    (status-fields :initarg :status-fields
                   :initform nil
-                  :accessor status-fields))
+                  :accessor status-fields)
+   (timer :initform nil
+          :accessor timer))
   (:metaclass qt-class)
   (:qt-superclass "QDialog")
   (:slots ("search(QString)" search-torrent)
@@ -64,7 +69,7 @@
   (let* ((status-bar (#_new QStatusBar))
          (max-up (#_new QSpinBox))
          (max-down (#_new QSpinBox))
-         (timer (#_new QTimer window)))
+         (timer (timer window)))
     (setf (status-fields window)
           (list :up-rate (#_new QLabel)
                 :max-up max-up
@@ -82,7 +87,7 @@
           do (add-permanent-widgets status-bar widget))
 
     (connect timer "timeout()" window (qslot "statusUpdate()"))
-    (#_start timer 1100)
+    (#_start timer 1000)
     status-bar))
 
 (defun status-update (window)
@@ -100,7 +105,8 @@
 
 (defmethod initialize-instance :after ((window main-window) &key)
   (new window)
-  (setf (torrents window) (list-torrents-humanly))
+  (setf (torrents window) (list-torrents-humanly)
+        (timer window) (#_new QTimer window))
   (let ((vbox (#_new QVBoxLayout window))
         (list (make-instance 'torrent-list
                              :row-key #'cdr
@@ -139,6 +145,10 @@
 (defun start-torrent (torrent-list)
   (loop for (hash) in (selected-items torrent-list)
         do (start hash)))
+
+(defun remove-torrent (torrent-list)
+  (loop for (hash) in (selected-items torrent-list)
+        do (erase hash)))
 
 (defun change-max-up (window value)
   (declare (ignore window))

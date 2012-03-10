@@ -35,6 +35,9 @@
 (defun start (hash)
   (call-rtorrent "d.start" hash))
 
+(defun erase (hash)
+  (call-rtorrent "d.erase" hash))
+
 (defun multicall (&rest args)
   (call-rtorrent "system.multicall"
                  (loop for (method . parameters) in args
