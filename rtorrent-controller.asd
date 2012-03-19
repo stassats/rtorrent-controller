@@ -1,9 +1,8 @@
 ;;; -*- Mode: Lisp -*-
 
-(asdf:defsystem #:rtorrent-controller
+(defsystem rtorrent-controller
   :serial t
-  :depends-on (s-xml-rpc inotify
-                         qt-ui)
+  :depends-on (s-xml-rpc inotify)
   :components ((:file "packages")
-               (:file "rtorrent-controller")
-               (:file "gui")))
+               (:file "rtorrent-controller")))
+

@@ -3,7 +3,7 @@
 ;;; This software is in the public domain and is
 ;;; provided with absolutely no warranty.
 
-(in-package #:rtorrent-controller)
+(in-package #:rtorrent-gui)
 (named-readtables:in-readtable :qt)
 
 (defvar *qapp* nil)
