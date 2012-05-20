@@ -8,9 +8,36 @@
 
 (defvar *qapp* nil)
 
+(defclass torrent ()
+  ((hash :initarg :hash
+         :initform nil
+         :accessor hash)
+   (name :initarg :name
+         :initform nil
+         :accessor name) 
+   (imdb-id :initarg :imdb-id
+            :initform nil
+            :accessor imdb-id)
+   (tracking-object :initarg :tracking-object
+                    :initform nil
+                    :accessor tracking-object)
+   (completed :initarg :completed
+              :initform nil
+              :accessor completed)))
+
+(defmethod object-description ((torrent torrent) &key)
+  (with-slots (name tracking-object) torrent
+    (if tracking-object
+        (object-description tracking-object)
+        name)))
+
+(defvar *torrents* nil)
+(defvar *torrents-to-tracking*
+  '(("A24ECB836E1AC4AEFF9E0A758A450F8320187A5F" . 53946)))
+
 (defmacro with-sbcl-float-traps (&body body)
-  `(#+sbcl ,@'(sb-int:with-float-traps-masked (:invalid :divide-by-zero))
-    #-sbcl progn
+  `(#-sbcl ,@'(sb-int:with-float-traps-masked (:invalid :divide-by-zero))
+    #+sbcl progn
     ,@body))
 
 (defun gui ()
@@ -25,6 +52,11 @@
         (when (timer window)
           (#_stop (timer window)))
         (#_hide window)))))
+
+(defun find-tracking-object (imdb-id)
+  (tracking:with-tracking
+    (storage:lookup 'tracking:movie
+                    (storage:where 'tracking:imdb-id imdb-id))))
 
 (defclass torrent-list (list-widget)
   ()
@@ -48,11 +80,35 @@
    (timer :initform nil
           :accessor timer))
   (:metaclass qt-class)
-  (:qt-superclass "QDialog")
+  (:qt-superclass "QMainWindow")
   (:slots ("search(QString)" search-torrent)
           ("statusUpdate()" status-update)
           ("changeMaxUp(int)" change-max-up)
           ("changeMaxDown(int)" change-max-down)))
+
+(defmethod initialize-instance :after ((window main-window) &key)
+  (new window)
+  (setf (torrents window) (list-torrent-objects)
+        (timer window) (#_new QTimer window))
+  (make-torrent-list (torrents window))
+  (let* ((central-widget (#_new QWidget window))
+         (vbox (#_new QVBoxLayout central-widget))
+         (list (make-instance 'torrent-list
+                              :items (torrents window)
+                              :selection-behavior :rows))
+         (search (#_new QLineEdit))
+         (status-bar (add-status-bar window))
+         (tab-widget (#_new QTabWidget)))
+    (#_setCentralWidget window central-widget)
+    (setf (torrent-list window) list)
+    (add-widgets vbox search tab-widget status-bar)
+    (#_addTab tab-widget list "All")
+    (connect search "textEdited(QString)" window "search(QString)")))
+
+(defun ensure-torrent (hash name)
+  (or (find hash *torrents* :key #'hash :test #'equal)
+      (car (push (make-instance 'torrent :hash hash :name name)
+                 *torrents*))))
 
 (defun list-torrents-humanly ()
   (process-lists
@@ -60,6 +116,10 @@
      3 state-description
      4 format-bytes)
    (list-torrents)))
+
+(defun list-torrent-objects ()
+  (loop for (hash name . rest) in (list-torrents-humanly)
+        collect (list* (ensure-torrent hash name) rest)))
 
 (defun add-permanent-widgets (status-bar &rest widgets)
   (loop for widget in widgets
@@ -103,33 +163,17 @@
           (#_setValue max-up (floor v-max-up 1024))
           (#_setValue max-down (floor v-max-down 1024))))))
 
-(defmethod initialize-instance :after ((window main-window) &key)
-  (new window)
-  (setf (torrents window) (list-torrents-humanly)
-        (timer window) (#_new QTimer window))
-  (let ((vbox (#_new QVBoxLayout window))
-        (list (make-instance 'torrent-list
-                             :row-key #'cdr
-                             :items (torrents window)
-                             :selection-behavior :rows))
-        (search (#_new QLineEdit))
-        (status-bar (add-status-bar window)))
-    (setf (torrent-list window) list)
-    (add-widgets vbox search list status-bar)
-    (connect search "textEdited(QString)" window "search(QString)")))
-
 (defun search-torrent (window text)
   (let ((text (string-trim '(#\Space #\Newline #\Return #\Tab) text))
         (torrents (torrents window)))
-    (setf (items (torrent-list window)
-                 :row-key #'cdr)
+    (setf (items (torrent-list window))
           (if (equal "" text)
               torrents
               (remove-if-not
-               (lambda (string)
-                 (search text string :test #'char-equal))
+               (lambda (torrent)
+                 (search text (object-description torrent) :test #'char-equal))
                torrents
-               :key #'second)))))
+               :key #'car)))))
 
 (defmethod display-menu ((widget torrent-list) item)
   (let ((menu (#_new QMenu)))
@@ -161,7 +205,7 @@
 ;;;
 
 (defmethod view-item ((list torrent-list) item)
-  (#_exec (make-instance 'details :torrent (car item))))
+  (#_show (make-instance 'details :torrent (car item))))
 
 (defclass file-list (list-widget)
   ()
@@ -184,23 +228,25 @@
   (:qt-superclass "QDialog")
   (:slots ("search(QString)" search-file)))
 
-(defun list-files-with-bytes (torrent)
-  (process-lists
-   '(1 format-bytes
-     2 priority-description)
-   (list-files-with-size torrent)))
-
 (defmethod initialize-instance :after ((window details) &key torrent)
   (new window)
-  (setf (files window) (list-files-with-bytes torrent))
+  (setf (files window) (list-files-with-bytes (hash torrent)))
   (let ((vbox (#_new QVBoxLayout window))
         (list (make-instance 'file-list
                              :items (files window)))
         (search (#_new QLineEdit)))
     (setf (file-list window) list)
+    (when (tracking-object torrent)
+      (tracking-qt::add-link vbox (tracking-object torrent)))
     (add-widgets vbox search list)
     (connect search "textEdited(QString)"
              window "search(QString)")))
+
+(defun list-files-with-bytes (torrent)
+  (process-lists
+   '(1 format-bytes
+     2 priority-description)
+   (list-files-with-size torrent)))
 
 (defun search-file (window text)
   (let ((text (string-trim '(#\Space #\Newline #\Return #\Tab) text))

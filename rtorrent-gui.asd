@@ -3,7 +3,8 @@
 (defsystem rtorrent-gui
   :serial t
   :depends-on (rtorrent-controller
-               qt-ui)
+               qt-ui
+               tracking-qt)
   :components ((:module "gui"
                 :serial t
                 :components
