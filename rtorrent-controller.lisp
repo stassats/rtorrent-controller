@@ -29,6 +29,26 @@
                  "d.get_state="
                  "d.get_down_rate="))
 
+(defun enabled-files-finished-p (torrent)
+  (loop for (priority chunks completed-chunks) in
+        (call-rtorrent "f.multicall" torrent ""
+                       "f.get_priority="
+                       "f.get_size_chunks="
+                       "f.get_completed_chunks=")
+        always (or (zerop priority)
+                   (= chunks completed-chunks))))
+
+(defun list-finished-torrents ()
+  (let ((torrents (call-rtorrent "d.multicall" ""
+                                 "d.get_hash="
+                                 "d.get_base_path="
+                                 "d.get_left_bytes=")))
+    (loop for (hash path size-left) in torrents
+          when (and (not (equal path ""))
+                    (or (zerop size-left)
+                        (enabled-files-finished-p hash)))
+          collect path)))
+
 (defun stop (hash)
   (call-rtorrent "d.stop" hash))
 
@@ -134,3 +154,13 @@
     (loop
      (dolist (event (inotify:read-events inot))
        (process-torrent (inotify:event-full-name event))))))
+
+#+(or)
+(ccl:save-application "rtr-controller"
+                      :toplevel-function #'rtorrent-controller:inotify-loop
+                      :prepend-kernel t)
+#+(or)
+(sb-ext:save-lisp-and-die "rtr-controller"
+                          :toplevel #'rtorrent-controller:inotify-loop
+                          :executable t
+                          :compression t)

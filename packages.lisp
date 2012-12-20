@@ -20,4 +20,5 @@
    #:set-upload-rate
    #:load-torrent
    #:disable-not-needed-files
-   #:disable-last-torrent))
+   #:disable-last-torrent
+   #:list-finished-torrents))

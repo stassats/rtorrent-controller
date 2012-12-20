@@ -90,7 +90,7 @@
   (new window)
   (setf (torrents window) (list-torrent-objects)
         (timer window) (#_new QTimer window))
-  (make-torrent-list (torrents window))
+  ;(make-torrent-list (torrents window))
   (let* ((central-widget (#_new QWidget window))
          (vbox (#_new QVBoxLayout central-widget))
          (list (make-instance 'torrent-list
@@ -191,8 +191,8 @@
         do (start hash)))
 
 (defun remove-torrent (torrent-list)
-  (loop for (hash) in (selected-items torrent-list)
-        do (erase hash)))
+  (loop for (torrent) in (selected-items torrent-list)
+        do (erase (hash torrent))))
 
 (defun change-max-up (window value)
   (declare (ignore window))
@@ -237,7 +237,7 @@
         (search (#_new QLineEdit)))
     (setf (file-list window) list)
     (when (tracking-object torrent)
-      (tracking-qt::add-link vbox (tracking-object torrent)))
+      (tracking-qt:add-link vbox (tracking-object torrent)))
     (add-widgets vbox search list)
     (connect search "textEdited(QString)"
              window "search(QString)")))
