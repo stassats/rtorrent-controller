@@ -35,23 +35,17 @@
 (defvar *torrents-to-tracking*
   '(("A24ECB836E1AC4AEFF9E0A758A450F8320187A5F" . 53946)))
 
-(defmacro with-sbcl-float-traps (&body body)
-  `(#-sbcl ,@'(sb-int:with-float-traps-masked (:invalid :divide-by-zero))
-    #+sbcl progn
-    ,@body))
-
 (defun gui ()
   (unless *qapp*
     (setf *qapp* (make-qapplication)))
   (let ((window (make-instance 'main-window)))
     (unwind-protect
-         (with-sbcl-float-traps
+         (progn
            (#_show window)
            (#_exec *qapp*))
-      (progn
-        (when (timer window)
-          (#_stop (timer window)))
-        (#_hide window)))))
+      (when (timer window)
+        (#_stop (timer window)))
+      (#_hide window))))
 
 (defun find-tracking-object (imdb-id)
   (tracking:with-tracking
