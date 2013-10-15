@@ -5,10 +5,12 @@
 
 (in-package #:rtorrent-controller)
 
+(defvar *host* "localhost")
+
 (defun call-rtorrent (method &rest arguments)
   (s-xml-rpc:xml-rpc-call (apply #'s-xml-rpc:encode-xml-rpc-call
                                  method arguments)
-                          :host "localhost"))
+                          :host *host*))
 
 (defun list-files (torrent)
   (mapcar #'car

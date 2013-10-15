@@ -21,4 +21,5 @@
    #:load-torrent
    #:disable-not-needed-files
    #:disable-last-torrent
-   #:list-finished-torrents))
+   #:list-finished-torrents
+   #:*host*))
