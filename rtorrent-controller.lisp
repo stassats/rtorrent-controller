@@ -135,8 +135,10 @@
     (file-error ())))
 
 (defun move-torrent (filename)
-  (sb-ext:run-program "scp" (list (sb-ext:native-namestring filename)
-                                  "desktop:/tmp/")
+  (sb-ext:run-program "rsync" (list "-az"
+                                    "--delay-updates"
+                                    (sb-ext:native-namestring filename)
+                                    "desktop:/tmp/")
                       :search t)
   (remove-torrent filename))
 
