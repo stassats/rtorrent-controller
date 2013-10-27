@@ -130,27 +130,38 @@
     (disable-not-needed-files
      (car (last (call-rtorrent "download_list" "") n))))
 
+(defun remove-torrent (filename)
+  (handler-case (delete-file filename)
+    (file-error ())))
+
+(defun move-torrent (filename)
+  (sb-ext:run-program "scp" (list filename "desktop:/tmp/")
+                      :search t)
+  (remove-torrent filename))
+
 (defun process-torrent (filename)
   (when (equal (pathname-type filename)
                "torrent")
-    (let ((namestring (remove #\\ (namestring filename))))
-      (format t "Loading ~a~%" namestring)
-      (handler-case
-          (progn
-            (load-torrent namestring :start (equal "v" (pathname-name filename)))
-            (disable-last-torrent)
-            (handler-case (delete-file filename)
-              (file-error ())))
-        (error (e)
-          (warn "An error ~a has occured while communicating with rTorrent." e))))))
+    (if (equal (machine-instance) "laptop")
+        (move-torrent filename)
+        (let ((namestring (remove #\\ (namestring filename))))
+          (format t "Loading ~a~%" namestring)
+          (handler-case
+              (progn
+                (load-torrent namestring :start (equal "v" (pathname-name filename)))
+                (disable-last-torrent)
+                (remove-torrent filename))
+            (error (e)
+              (warn "An error ~a has occured while communicating with rTorrent." e)))))))
 
 (defun load-existing-torrents (directory)
   (mapcar #'process-torrent
 	  (directory (merge-pathnames "*.torrent" directory))))
 
-(defun inotify-loop (&optional (directory (user-homedir-pathname)))
+(defun inotify-loop (&key (directory #p"/tmp/"))
+  
   (load-existing-torrents directory)
-  (inotify:with-inotify (inot `((,directory ,(logior inotify:in-create
+  (inotify:with-inotify (inot `((,directory ,(logior inotify:in-close-write
                                                      inotify:in-moved-to))))
     (write-line "Waiting for files.")
     (loop
@@ -165,4 +176,4 @@
 (sb-ext:save-lisp-and-die "rtr-controller"
                           :toplevel #'rtorrent-controller:inotify-loop
                           :executable t
-                          :compression t)
+                          :compression 9)
