@@ -163,8 +163,7 @@
 (defun inotify-loop (&key (directory #p"/tmp/"))
   
   (load-existing-torrents directory)
-  (inotify:with-inotify (inot `((,directory ,(logior inotify:in-close-write
-                                                     inotify:in-moved-to))))
+  (inotify:with-inotify (inot `((,directory ,inotify:in-moved-to)))
     (write-line "Waiting for files.")
     (loop
      (dolist (event (inotify:read-events inot))
