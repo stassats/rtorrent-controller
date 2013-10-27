@@ -135,17 +135,19 @@
     (file-error ())))
 
 (defun move-torrent (filename)
-  (sb-ext:run-program "scp" (list filename "desktop:/tmp/")
+  (sb-ext:run-program "scp" (list (sb-ext:native-namestring filename)
+                                  "desktop:/tmp/")
                       :search t)
   (remove-torrent filename))
 
 (defun process-torrent (filename)
   (when (equal (pathname-type filename)
                "torrent")
+    (format t "Loading ~a~%" filename)
     (if (equal (machine-instance) "laptop")
         (move-torrent filename)
         (let ((namestring (remove #\\ (namestring filename))))
-          (format t "Loading ~a~%" namestring)
+
           (handler-case
               (progn
                 (load-torrent namestring :start (equal "v" (pathname-name filename)))
