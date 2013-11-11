@@ -135,11 +135,19 @@
     (file-error ())))
 
 (defun move-torrent (filename)
+  #+sbcl
   (sb-ext:run-program "rsync" (list "-az"
                                     "--delay-updates"
                                     (sb-ext:native-namestring filename)
                                     "desktop:/tmp/")
                       :search t)
+  #+ccl
+  (ccl:run-program "rsync" (list "-az"
+                                 "--delay-updates"
+                                 (ccl:native-translated-namestring filename)
+                                 "desktop:/tmp/"))
+  #-(or sbcl ccl)
+  (error "Not supported")
   (remove-torrent filename))
 
 (defun process-torrent (filename)
