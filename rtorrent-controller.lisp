@@ -130,54 +130,86 @@
     (disable-not-needed-files
      (car (last (call-rtorrent "download_list" "") n))))
 
-(defun remove-torrent (filename)
+(defun run-program (program args)
+  #+sbcl
+  (sb-ext:run-program program args
+                      :search t)
+  #+ccl
+  (ccl:run-program program args)
+  #-(or sbcl ccl)
+  (error "Not supported"))
+
+(defun remove-file (filename)
   (handler-case (delete-file filename)
     (file-error ())))
 
-(defun move-torrent (filename)
-  #+sbcl
-  (sb-ext:run-program "rsync" (list "-az"
-                                    "--delay-updates"
-                                    (sb-ext:native-namestring filename)
-                                    "desktop:/tmp/")
-                      :search t)
-  #+ccl
-  (ccl:run-program "rsync" (list "-az"
-                                 "--delay-updates"
-                                 (ccl:native-translated-namestring filename)
-                                 "desktop:/tmp/"))
-  #-(or sbcl ccl)
-  (error "Not supported")
-  (remove-torrent filename))
+(defun native-namestring (file)
+  #+sbcl (sb-ext:native-namestring file)
+  #+ccl (ccl:native-translated-namestring file)
+  #-(or sbcl ccl) (error "Not supported"))
+
+(defun move-file (filename)
+  (run-program "rsync" (list "-az"
+                             "--delay-updates"
+                             (sb-ext:native-namestring filename)
+                             "desktop:/tmp/"))
+  (remove-file filename))
 
 (defun process-torrent (filename)
-  (when (equal (pathname-type filename)
-               "torrent")
-    (format t "Loading ~a~%" filename)
-    (if (equal (machine-instance) "laptop")
-        (move-torrent filename)
-        (let ((namestring (remove #\\ (namestring filename))))
+  (format t "Loading ~a~%" filename)
+  (if (equal (machine-instance) "laptop")
+      (move-file filename)
+      (let ((namestring (remove #\\ (namestring filename))))
+        (load-torrent namestring :start (equal "v" (pathname-name filename)))
+        (disable-last-torrent)
+        (remove-file filename))))
 
-          (handler-case
-              (progn
-                (load-torrent namestring :start (equal "v" (pathname-name filename)))
-                (disable-last-torrent)
-                (remove-torrent filename))
-            (error (e)
-              (warn "An error ~a has occured while communicating with rTorrent." e)))))))
+(defun process-subtitle (filename)
+  (format t "Loading ~a~%" filename)
+  (cond ((equal (machine-instance) "laptop")
+         (move-file filename))
+        (t
+         (let ((new-path (namestring (merge-pathnames
+                                      (make-pathname
+                                       :directory '(:relative "sub")
+                                       :defaults filename)
+                                      (user-homedir-pathname)))))
+          (run-program "mv"
+                       (list (namestring  filename) new-path)) 
+          (run-program "rj" (list new-path))))))
+
+(defun process-zip-subtitle (filename)
+  (format t "Loading ~a~%" filename)
+  (cond ((equal (machine-instance) "laptop")
+         (move-file filename))
+        (t
+         (run-program "us"
+                      (list
+                       (namestring filename))))))
 
 (defun load-existing-torrents (directory)
   (mapcar #'process-torrent
 	  (directory (merge-pathnames "*.torrent" directory))))
 
 (defun inotify-loop (&key (directory #p"/tmp/"))
-  
   (load-existing-torrents directory)
   (inotify:with-inotify (inot `((,directory ,inotify:in-moved-to)))
     (write-line "Waiting for files.")
     (loop
      (dolist (event (inotify:read-events inot))
-       (process-torrent (inotify:event-full-name event))))))
+       (handler-case
+         (let* ((path (inotify:event-full-name event))
+                (type (pathname-type path)))
+           (cond ((equal type "torrent")
+                  (process-torrent path))
+                 ((and (equal type "zip")
+                       (equal (pathname-name path) "g"))
+                  (process-zip-subtitle path))
+                 ((equal type "srt")
+                  (process-subtitle path))))
+         (error (e)
+           (warn "An error ~a occured while processing event ~s"
+                 e event)))))))
 
 #+(or)
 (ccl:save-application "rtr-controller"
