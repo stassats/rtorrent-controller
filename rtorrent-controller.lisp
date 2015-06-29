@@ -191,8 +191,14 @@
   (mapcar #'process-torrent
 	  (directory (merge-pathnames "*.torrent" directory))))
 
+(defun load-existing-subtitles (directory)
+  (let ((sub (probe-file (merge-pathnames "g.zip" directory))))
+    (when sub
+      (process-zip-subtitle sub))))
+
 (defun inotify-loop (&key (directory #p"/tmp/"))
   (load-existing-torrents directory)
+  (load-existing-subtitles directory)
   (inotify:with-inotify (inot `((,directory ,inotify:in-moved-to)))
     (write-line "Waiting for files.")
     (loop
