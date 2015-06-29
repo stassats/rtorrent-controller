@@ -151,7 +151,7 @@
 (defun move-file (filename)
   (run-program "rsync" (list "-az"
                              "--delay-updates"
-                             (sb-ext:native-namestring filename)
+                             (native-namestring filename)
                              "desktop:/tmp/"))
   (remove-file filename))
 
