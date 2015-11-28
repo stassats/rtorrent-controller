@@ -157,18 +157,16 @@
 
 (defun process-torrent (filename)
   (format t "Loading ~a~%" filename)
-  (if (equal (machine-instance) "laptop")
-      (move-file filename)
+  (if (equal (machine-instance) "desktop")
       (let ((namestring (remove #\\ (namestring filename))))
         (load-torrent namestring :start (equal "v" (pathname-name filename)))
         (disable-last-torrent)
-        (remove-file filename))))
+        (remove-file filename))
+      (move-file filename)))
 
 (defun process-subtitle (filename)
   (format t "Loading ~a~%" filename)
-  (cond ((equal (machine-instance) "laptop")
-         (move-file filename))
-        (t
+  (cond ((equal (machine-instance) "desktop")
          (let ((new-path (namestring (merge-pathnames
                                       (make-pathname
                                        :directory '(:relative "sub")
@@ -176,16 +174,18 @@
                                       (user-homedir-pathname)))))
           (run-program "mv"
                        (list (namestring  filename) new-path)) 
-          (run-program "rj" (list new-path))))))
+          (run-program "rj" (list new-path))))
+        (t
+         (move-file filename))))
 
 (defun process-zip-subtitle (filename)
   (format t "Loading ~a~%" filename)
-  (cond ((equal (machine-instance) "laptop")
-         (move-file filename))
-        (t
+  (cond ((equal (machine-instance) "desktop")
          (run-program "us"
                       (list
-                       (namestring filename))))))
+                       (namestring filename))))
+        (t
+         (move-file filename))))
 
 (defun load-existing-torrents (directory)
   (mapcar #'process-torrent
@@ -196,7 +196,9 @@
     (when sub
       (process-zip-subtitle sub))))
 
-(defun inotify-loop (&key (directory #p"/tmp/"))
+#+linux
+(defun inotify-loop (&key (directory #-darwin #p"/tmp/"
+                                     #+darwin #p"~/Documents"))
   (load-existing-torrents directory)
   (load-existing-subtitles directory)
   (inotify:with-inotify (inot `((,directory ,inotify:in-moved-to)))
@@ -217,12 +219,41 @@
            (warn "An error ~a occured while processing event ~s"
                  e event)))))))
 
-#+(or)
-(ccl:save-application "rtr-controller"
-                      :toplevel-function #'rtorrent-controller:inotify-loop
-                      :prepend-kernel t)
+#+darwin
+(defun kqueue-loop (directory)
+  (let ((wild-directory (make-pathname :defaults directory
+                                       :name :wild
+                                       :type :wild)))
+    (kqueue:with-kqueue (kqueue `((,directory ,kqueue:note-write)))
+      (write-line "Waiting for files.")
+      (loop
+       (dolist (event (kqueue:read-events kqueue))
+         (handler-case
+             (loop for path in (directory wild-directory)
+                   for type = (pathname-type path)
+                   do
+                   (cond ((equal type "torrent")
+                          (process-torrent path))
+                         ((and (equal type "zip")
+                               (equal (pathname-name path) "g"))
+                          (process-zip-subtitle path))
+                         ((equal type "srt")
+                          (process-subtitle path))))
+           (error (e)
+             (warn "An error ~a occured while processing event ~s"
+                   e event))))))))
+
+(defun fs-loop (&key (directory #-darwin #p"/tmp/"
+                                #+darwin (merge-pathnames #p"Downloads/"
+                                                          (user-homedir-pathname))))
+  (load-existing-torrents directory)
+  (load-existing-subtitles directory)
+  #+linux (inotify-loop directory)
+  #+darwin (kqueue-loop directory))
+
+
 #+(or)
 (sb-ext:save-lisp-and-die "rtr-controller"
-                          :toplevel #'rtorrent-controller:inotify-loop
+                          :toplevel #'rtorrent-controller:fs-loop
                           :executable t
                           :compression 9)

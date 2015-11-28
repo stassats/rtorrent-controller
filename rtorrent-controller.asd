@@ -2,7 +2,8 @@
 
 (defsystem rtorrent-controller
   :serial t
-  :depends-on (s-xml-rpc inotify)
+  :depends-on (s-xml-rpc #+linux inotify
+                         #+darwin "kqueue")
   :components ((:file "packages")
                (:file "rtorrent-controller")))
 

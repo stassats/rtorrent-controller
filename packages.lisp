@@ -3,7 +3,6 @@
 (defpackage #:rtorrent-controller
   (:use #:cl)
   (:export
-   #:inotify-loop
    #:list-files
    #:list-files-with-size
    #:list-torrents
@@ -22,4 +21,5 @@
    #:disable-not-needed-files
    #:disable-last-torrent
    #:list-finished-torrents
-   #:*host*))
+   #:*host*
+   #:fs-loop))
