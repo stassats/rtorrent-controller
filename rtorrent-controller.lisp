@@ -225,7 +225,6 @@
                                        :name :wild
                                        :type :wild)))
     (kqueue:with-kqueue (kqueue `((,directory ,kqueue:note-write)))
-      (write-line "Waiting for files.")
       (loop
        (dolist (event (kqueue:read-events kqueue))
          (handler-case
