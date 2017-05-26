@@ -108,7 +108,7 @@
 ;;;
 
 (defvar *useful-files* '("flac" "cue" "mp3" "ape" "wv" "m4a" "ac3"
-                         "pdf" "djvu"
+                         "pdf" "epub" "djvu"
                          "avi" "mkv" "mp4" "vob" "ifo" "bup" "mov"))
 
 (defun useful-file-p (filename)
@@ -157,7 +157,7 @@
 
 (defun process-torrent (filename)
   (format t "Loading ~a~%" filename)
-  (if (equal (machine-instance) "desktop")
+  (if (equal (machine-instance) "debian")
       (let ((namestring (remove #\\ (namestring filename))))
         (load-torrent namestring :start (equal "v" (pathname-name filename)))
         (disable-last-torrent)
@@ -197,8 +197,7 @@
       (process-zip-subtitle sub))))
 
 #+linux
-(defun inotify-loop (&key (directory #-darwin #p"/tmp/"
-                                     #+darwin #p"~/Documents"))
+(defun inotify-loop (directory)
   (load-existing-torrents directory)
   (load-existing-subtitles directory)
   (inotify:with-inotify (inot `((,directory ,inotify:in-moved-to)))
@@ -254,5 +253,4 @@
 #+(or)
 (sb-ext:save-lisp-and-die "rtr-controller"
                           :toplevel #'rtorrent-controller:fs-loop
-                          :executable t
-                          :compression 9)
+                          :executable t)
