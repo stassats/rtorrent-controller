@@ -15,7 +15,7 @@
 (defun list-files (torrent)
   (mapcar #'car
           (call-rtorrent "f.multicall" torrent
-                         "" "f.get_path=")))
+                         "" "f.path=")))
 
 (defun list-files-with-size (torrent)
   (call-rtorrent "f.multicall" torrent
@@ -34,17 +34,17 @@
 (defun enabled-files-finished-p (torrent)
   (loop for (priority chunks completed-chunks) in
         (call-rtorrent "f.multicall" torrent ""
-                       "f.get_priority="
-                       "f.get_size_chunks="
-                       "f.get_completed_chunks=")
+                       "f.priority="
+                       "f.size_chunks="
+                       "f.completed_chunks=")
         always (or (zerop priority)
                    (= chunks completed-chunks))))
 
 (defun list-finished-torrents ()
-  (let ((torrents (call-rtorrent "d.multicall" ""
-                                 "d.get_hash="
-                                 "d.get_base_path="
-                                 "d.get_left_bytes=")))
+  (let ((torrents (call-rtorrent "d.multicall2" "" ""
+                                 "d.hash="
+                                 "d.base_path="
+                                 "d.left_bytes=")))
     (loop for (hash path size-left) in torrents
           when (and (not (equal path ""))
                     (or (zerop size-left)
@@ -117,14 +117,14 @@
 
 (defun load-torrent (filename &key start)
   (call-rtorrent (if start
-                     "load_start"
-                     "load") filename))
+                     "load.start"
+                     "load.normal") "" filename))
 
 (defun disable-not-needed-files (torrent)
   (loop for index from 0
         for file in (list-files torrent)
         unless (useful-file-p file)
-        do (call-rtorrent "f.set_priority" torrent index 0)))
+        do (call-rtorrent "f.priority.set" (format nil "~a:f~a" torrent index) 0)))
 
 (defun disable-last-torrent (&optional (n 1))
     (disable-not-needed-files
